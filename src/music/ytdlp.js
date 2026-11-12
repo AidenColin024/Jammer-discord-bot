@@ -2,6 +2,7 @@ const youtubedl = require('youtube-dl-exec');
 
 async function searchTrack(text) {
   let search = text;
+
   if (!text.startsWith('http')) {
     search = 'ytsearch1:' + text;
   }
@@ -14,6 +15,7 @@ async function searchTrack(text) {
   });
 
   let video = info;
+
   if (info.entries) {
     video = info.entries[0];
   }
@@ -32,14 +34,55 @@ async function searchTrack(text) {
   };
 }
 
+async function resolvePlaylist(url) {
+  const info = await youtubedl(url, {
+    dumpSingleJson: true,
+    flatPlaylist: true,
+    skipDownload: true,
+    noWarnings: true,
+  });
+
+  if (!info.entries) {
+    return [];
+  }
+
+  return info.entries
+    .filter((entry) => entry)
+    .map((entry) => ({
+      title: entry.title || 'Onbekend nummer',
+      artist: entry.uploader || entry.channel || 'Onbekend',
+      album: null,
+      releaseDate: null,
+      duration: entry.duration || 0,
+      url:
+        entry.url && entry.url.startsWith('http')
+          ? entry.url
+          : `https://www.youtube.com/watch?v=${entry.id}`,
+      thumbnail: entry.thumbnail || null,
+    }));
+}
+
 function startStream(url) {
   const stream = youtubedl.exec(
     url,
-    { output: '-', format: 'bestaudio', quiet: true },
-    { stdio: ['ignore', 'pipe', 'ignore'] }
+    {
+      output: '-',
+      format: 'bestaudio',
+      quiet: true,
+      noPlaylist: true,
+    },
+    {
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }
   );
+
   stream.catch(function () {});
+
   return stream;
 }
 
-module.exports = { searchTrack, startStream };
+module.exports = {
+  searchTrack,
+  resolvePlaylist,
+  startStream,
+};

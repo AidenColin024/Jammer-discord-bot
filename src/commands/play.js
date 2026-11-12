@@ -23,13 +23,16 @@ module.exports = {
     }
 
     if (text.includes('spotify')) {
-      await interaction.reply('Spotify-links werken nog niet. Gebruik een zoekterm of YouTube-link.');
+      await interaction.reply(
+        'Spotify-links werken nog niet. Gebruik een zoekterm of YouTube-link.'
+      );
       return;
     }
 
     await interaction.deferReply();
 
     let track;
+
     try {
       track = await searchTrack(text);
     } catch (error) {
@@ -47,9 +50,18 @@ module.exports = {
     const position = addTrack(server, track);
 
     if (position === 0) {
-      await interaction.editReply('Speelt nu: ' + track.title + ' - ' + track.artist);
+      await interaction.editReply(
+        'Speelt nu: ' + track.title + ' - ' + track.artist
+      );
     } else {
-      await interaction.editReply('Op plek ' + position + ' in de wachtrij: ' + track.title + ' - ' + track.artist);
+      await interaction.editReply(
+        'Op plek ' +
+          position +
+          ' in de wachtrij: ' +
+          track.title +
+          ' - ' +
+          track.artist
+      );
     }
   },
 };

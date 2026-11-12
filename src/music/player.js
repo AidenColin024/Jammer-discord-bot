@@ -5,6 +5,7 @@ const {
   AudioPlayerStatus,
   VoiceConnectionStatus,
 } = require('@discordjs/voice');
+
 const { startStream } = require('./ytdlp');
 
 const servers = {};
@@ -32,12 +33,13 @@ function joinChannel(channel) {
   });
 
   const player = createAudioPlayer();
+
   connection.subscribe(player);
 
   const server = {
     channelId: channel.id,
-    connection: connection,
-    player: player,
+    connection,
+    player,
     current: null,
     stream: null,
     queue: [],
@@ -56,6 +58,7 @@ function joinChannel(channel) {
   });
 
   servers[guildId] = server;
+
   return server;
 }
 
@@ -63,6 +66,7 @@ function playNext(server) {
   if (server.stream) {
     server.stream.kill();
   }
+
   server.stream = null;
   server.current = null;
 
@@ -71,9 +75,13 @@ function playNext(server) {
   }
 
   const track = server.queue.shift();
+
   server.stream = startStream(track.url);
   server.current = track;
-  server.player.play(createAudioResource(server.stream.stdout));
+
+  server.player.play(
+    createAudioResource(server.stream.stdout)
+  );
 }
 
 function addTrack(server, track) {
@@ -87,16 +95,39 @@ function addTrack(server, track) {
   return server.queue.length;
 }
 
+function addTracks(server, tracks) {
+  server.queue.push(...tracks);
+
+  if (server.current === null) {
+    playNext(server);
+  }
+
+  return server.queue.length;
+}
+
 function leave(guildId) {
   const server = servers[guildId];
+
   if (!server) {
     return;
   }
 
   server.queue = [];
+
+  if (server.stream) {
+    server.stream.kill();
+  }
+
   server.player.stop();
   server.connection.destroy();
+
   delete servers[guildId];
 }
 
-module.exports = { getServer, joinChannel, addTrack, leave };
+module.exports = {
+  getServer,
+  joinChannel,
+  addTrack,
+  addTracks,
+  leave,
+};
