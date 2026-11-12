@@ -1,5 +1,6 @@
 const { SlashCommandBuilder } = require('discord.js');
 const { searchTrack } = require('../music/ytdlp');
+const { getSpotifyTrack } = require('../music/spotify');
 const { joinChannel, addTrack } = require('../music/player');
 
 module.exports = {
@@ -9,7 +10,7 @@ module.exports = {
     .addStringOption(function (option) {
       return option
         .setName('nummer')
-        .setDescription('Zoekterm of YouTube-link')
+        .setDescription('Zoekterm, YouTube-link of Spotify-link')
         .setRequired(true);
     }),
 
@@ -22,27 +23,62 @@ module.exports = {
       return;
     }
 
-    if (text.includes('spotify')) {
-      await interaction.reply(
-        'Spotify-links werken nog niet. Gebruik een zoekterm of YouTube-link.'
-      );
-      return;
-    }
-
     await interaction.deferReply();
 
     let track;
 
     try {
-      track = await searchTrack(text);
+      // Spotify track-link
+      if (text.includes('open.spotify.com/track/')) {
+        const spotifyTrack = await getSpotifyTrack(text);
+
+        if (!spotifyTrack) {
+          await interaction.editReply(
+            'Ik kon dit Spotify-nummer niet vinden.'
+          );
+          return;
+        }
+
+        // Zoek het Spotify-nummer op YouTube
+        const search =
+          spotifyTrack.title + ' ' + spotifyTrack.artist;
+
+        track = await searchTrack(search);
+
+        if (track) {
+          // Gebruik de correcte informatie van Spotify
+          track.title = spotifyTrack.title;
+          track.artist = spotifyTrack.artist;
+          track.album = spotifyTrack.album;
+          track.releaseDate = spotifyTrack.releaseDate;
+        }
+      }
+
+      // Andere Spotify-links ondersteunen we nog niet
+      else if (text.includes('open.spotify.com/')) {
+        await interaction.editReply(
+          'Deze Spotify-link wordt nog niet ondersteund. Gebruik voorlopig een Spotify-link van één nummer.'
+        );
+        return;
+      }
+
+      // Normale zoekterm of YouTube-link
+      else {
+        track = await searchTrack(text);
+      }
     } catch (error) {
-      console.log(error);
-      await interaction.editReply('Er ging iets mis bij het zoeken.');
+      console.log('Fout bij zoeken:', error);
+
+      await interaction.editReply(
+        'Er ging iets mis bij het zoeken.'
+      );
       return;
     }
 
     if (!track) {
-      await interaction.editReply('Niets gevonden voor: ' + text);
+      await interaction.editReply(
+        'Niets gevonden voor: ' + text
+      );
       return;
     }
 
@@ -51,7 +87,10 @@ module.exports = {
 
     if (position === 0) {
       await interaction.editReply(
-        'Speelt nu: ' + track.title + ' - ' + track.artist
+        'Speelt nu: ' +
+          track.title +
+          ' - ' +
+          track.artist
       );
     } else {
       await interaction.editReply(
