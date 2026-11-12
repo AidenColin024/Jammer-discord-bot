@@ -9,7 +9,7 @@ function isUrl(text) {
   }
 }
 
-// Zoekt een nummer op (zoekterm of link) en geeft de gegevens terug
+// Zoekt één nummer op
 async function resolveTrack(query) {
   const target = isUrl(query) ? query : `ytsearch1:${query}`;
 
@@ -21,8 +21,8 @@ async function resolveTrack(query) {
     format: 'bestaudio',
   });
 
-  // Bij een zoekopdracht komt het resultaat in een lijst (entries)
   const entry = info.entries ? info.entries[0] : info;
+
   if (!entry) return null;
 
   return {
@@ -36,15 +36,52 @@ async function resolveTrack(query) {
   };
 }
 
-// Start een audiostream van een YouTube-link
+// Haalt alle nummers uit een playlist
+async function resolvePlaylist(url) {
+  const info = await youtubedl(url, {
+    dumpSingleJson: true,
+    flatPlaylist: true,
+    skipDownload: true,
+    noWarnings: true,
+  });
+
+  if (!info.entries) return [];
+
+  return info.entries.map((entry) => ({
+    title: entry.title || 'Onbekend nummer',
+    artist: entry.uploader || entry.channel || 'Onbekend',
+    album: null,
+    releaseDate: null,
+    duration: entry.duration || 0,
+    url: entry.url.startsWith('http')
+      ? entry.url
+      : `https://www.youtube.com/watch?v=${entry.id}`,
+    thumbnail: entry.thumbnail || null,
+  }));
+}
+
+// Start audiostream
 function createStream(url) {
   const proc = youtubedl.exec(
     url,
-    { output: '-', format: 'bestaudio', quiet: true, noPlaylist: true },
-    { stdio: ['ignore', 'pipe', 'ignore'] }
+    {
+      output: '-',
+      format: 'bestaudio',
+      quiet: true,
+      noPlaylist: true,
+    },
+    {
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }
   );
-  proc.catch(() => {}); // voorkomt een crash als we het proces stoppen
+
+  proc.catch(() => {});
+
   return proc;
 }
 
-module.exports = { resolveTrack, createStream };
+module.exports = {
+  resolveTrack,
+  resolvePlaylist,
+  createStream,
+};
