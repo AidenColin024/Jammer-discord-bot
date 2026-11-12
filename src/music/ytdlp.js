@@ -55,9 +55,10 @@ async function resolvePlaylist(url) {
       album: null,
       releaseDate: null,
       duration: entry.duration || 0,
-      url: entry.url && entry.url.startsWith('http')
-        ? entry.url
-        : `https://www.youtube.com/watch?v=${entry.id}`,
+      url:
+        entry.url && entry.url.startsWith('http')
+          ? entry.url
+          : `https://www.youtube.com/watch?v=${entry.id}`,
       thumbnail: entry.thumbnail || null,
     }));
 }

@@ -18,12 +18,10 @@ function joinChannel(channel) {
   const guildId = channel.guild.id;
   const existing = servers[guildId];
 
-  // Bot zit al in hetzelfde kanaal
   if (existing && existing.channelId === channel.id) {
     return existing;
   }
 
-  // Oude verbinding afsluiten
   if (existing) {
     leave(guildId);
   }
@@ -47,7 +45,6 @@ function joinChannel(channel) {
     queue: [],
   };
 
-  // Als een nummer klaar is, volgende nummer starten
   player.on(AudioPlayerStatus.Idle, function () {
     playNext(server);
   });
@@ -87,7 +84,6 @@ function playNext(server) {
   );
 }
 
-// Eén nummer toevoegen
 function addTrack(server, track) {
   server.queue.push(track);
 
@@ -99,8 +95,7 @@ function addTrack(server, track) {
   return server.queue.length;
 }
 
-// Meerdere nummers tegelijk toevoegen
-// Deze gebruiken we voor playlists
+// Meerdere nummers tegelijk toevoegen voor playlists
 function addTracks(server, tracks) {
   server.queue.push(...tracks);
 
