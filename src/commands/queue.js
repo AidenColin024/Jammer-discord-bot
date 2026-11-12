@@ -14,7 +14,7 @@ module.exports = {
       return;
     }
 
-    let message = '🎵 Speelt nu: ' + server.current.title + ' - ' + server.current.artist + '\n\n';
+    let message = 'Speelt nu: ' + server.current.title + ' - ' + server.current.artist + '\n\n';
     message += ' Hierna:\n';
 
     if (server.queue.length === 0) {

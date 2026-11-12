@@ -1,83 +1,55 @@
-const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
-const { resolveTrack } = require('../music/ytdlp');
-const { connect, addTrack } = require('../music/player');
-
-function formatDuration(seconds) {
-  if (!seconds) return 'Live';
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60).toString().padStart(2, '0');
-  return `${m}:${s}`;
-}
+const { SlashCommandBuilder } = require('discord.js');
+const { searchTrack } = require('../music/ytdlp');
+const { joinChannel, addTrack } = require('../music/player');
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('play')
     .setDescription('Speel een nummer af of zet het in de wachtrij')
-    .addStringOption((option) =>
-      option
+    .addStringOption(function (option) {
+      return option
         .setName('nummer')
         .setDescription('Zoekterm of YouTube-link')
-        .setRequired(true)
-    ),
+        .setRequired(true);
+    }),
 
   async execute(interaction) {
-    const query = interaction.options.getString('nummer');
-    const voiceChannel = interaction.member.voice.channel;
+    const text = interaction.options.getString('nummer');
+    const channel = interaction.member.voice.channel;
 
-    if (!voiceChannel) {
-      return interaction.reply({
-        content: '🔇 Ga eerst in een spraakkanaal zitten.',
-        flags: MessageFlags.Ephemeral,
-      });
+    if (!channel) {
+      await interaction.reply('Ga eerst in een spraakkanaal zitten.');
+      return;
     }
 
-    if (/open\.spotify\.com|^spotify:/.test(query)) {
-      return interaction.reply({
-        content: '🟢 Spotify-links worden nog gebouwd. Gebruik voorlopig een zoekterm of YouTube-link.',
-        flags: MessageFlags.Ephemeral,
-      });
+    if (text.includes('spotify')) {
+      await interaction.reply('Spotify-links werken nog niet. Gebruik een zoekterm of YouTube-link.');
+      return;
     }
 
     await interaction.deferReply();
 
     let track;
     try {
-      track = await resolveTrack(query);
+      track = await searchTrack(text);
     } catch (error) {
-      console.error('Zoekfout:', error.message);
-      return interaction.editReply('❌ Er ging iets mis bij het zoeken.');
+      console.log(error);
+      await interaction.editReply('Er ging iets mis bij het zoeken.');
+      return;
     }
 
     if (!track) {
-      return interaction.editReply(`❌ Niets gevonden voor **${query}**.`);
+      await interaction.editReply('Niets gevonden voor: ' + text);
+      return;
     }
 
-    let position;
-    try {
-      const gp = await connect(voiceChannel);
-      position = addTrack(gp, track);
-    } catch (error) {
-      console.error('Verbindingsfout:', error.message);
-      return interaction.editReply('❌ Ik kon niet verbinden met het spraakkanaal.');
-    }
-
-    const embed = new EmbedBuilder()
-      .setColor(0x1db954)
-      .setTitle(track.title)
-      .setURL(track.url)
-      .setThumbnail(track.thumbnail)
-      .setFooter({ text: `Aangevraagd door ${interaction.user.username}` });
+    const server = joinChannel(channel);
+    const position = addTrack(server, track);
 
     if (position === 0) {
-      embed
-        .setAuthor({ name: '🎵 Speelt nu' })
-        .setDescription(`${track.artist} • ${formatDuration(track.duration)}`);
+      await interaction.editReply('Speelt nu: ' + track.title + ' - ' + track.artist);
     } else {
-      embed
-        .setAuthor({ name: '➕ Toegevoegd aan de wachtrij' })
-        .setDescription(`${track.artist} • ${formatDuration(track.duration)}\nPositie in wachtrij: **${position}**`);
+      await interaction.editReply('Op plek ' + position + ' in de wachtrij: ' + track.title + ' - ' + track.artist);
     }
-
-    await interaction.editReply({ embeds: [embed] });
   },
 };
