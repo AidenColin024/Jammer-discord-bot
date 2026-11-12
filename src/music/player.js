@@ -9,7 +9,6 @@ const {
 } = require('@discordjs/voice');
 const { createStream } = require('./ytdlp');
 
-// Per server (guild) één speler
 const guilds = new Map();
 
 function getGuildPlayer(guildId) {
@@ -20,11 +19,9 @@ async function connect(voiceChannel) {
   const guildId = voiceChannel.guild.id;
   const existing = guilds.get(guildId);
 
-  // Al in hetzelfde kanaal? Hergebruik de verbinding
   if (existing && existing.connection.joinConfig.channelId === voiceChannel.id) {
     return existing;
   }
-  // In een ander kanaal? Eerst netjes weggaan
   if (existing) destroy(guildId);
 
   const connection = joinVoiceChannel({
@@ -39,19 +36,19 @@ async function connect(voiceChannel) {
   const player = createAudioPlayer();
   connection.subscribe(player);
 
-  const gp = { connection, player, current: null, process: null };
+  const gp = { connection, player, current: null, process: null, queue: [] };
 
   player.on('error', (err) => console.error('Audiofout:', err.message));
 
-  // Nummer afgelopen
   player.on(AudioPlayerStatus.Idle, () => {
-    gp.current = null;
     if (gp.process) gp.process.kill();
     gp.process = null;
-    // 👉 Hier komt bij feature 3 het volgende nummer uit de wachtrij
+    gp.current = null;
+
+    const next = gp.queue.shift();
+    if (next) play(gp, next);
   });
 
-  // Verbinding kwijt (bijv. bot uit kanaal gesleept)
   connection.on(VoiceConnectionStatus.Disconnected, async () => {
     try {
       await Promise.race([
@@ -77,13 +74,22 @@ function play(gp, track) {
   gp.current = track;
   gp.player.play(resource);
 
-  // Pas na het starten van het nieuwe nummer het oude proces stoppen
   if (oldProcess) oldProcess.kill();
+}
+
+function addTrack(gp, track) {
+  if (!gp.current) {
+    play(gp, track);
+    return 0;
+  }
+  gp.queue.push(track);
+  return gp.queue.length;
 }
 
 function destroy(guildId) {
   const gp = guilds.get(guildId);
   if (!gp) return;
+  gp.queue = [];
   if (gp.process) gp.process.kill();
   gp.player.stop(true);
   if (gp.connection.state.status !== VoiceConnectionStatus.Destroyed) {
@@ -92,4 +98,4 @@ function destroy(guildId) {
   guilds.delete(guildId);
 }
 
-module.exports = { connect, play, destroy, getGuildPlayer };
+module.exports = { connect, addTrack, destroy, getGuildPlayer };
