@@ -95,7 +95,6 @@ function addTrack(server, track) {
   return server.queue.length;
 }
 
-// Meerdere nummers tegelijk toevoegen voor playlists
 function addTracks(server, tracks) {
   server.queue.push(...tracks);
 

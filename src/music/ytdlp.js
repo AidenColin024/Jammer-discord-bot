@@ -34,7 +34,6 @@ async function searchTrack(text) {
   };
 }
 
-// Haalt alle nummers uit een YouTube-playlist
 async function resolvePlaylist(url) {
   const info = await youtubedl(url, {
     dumpSingleJson: true,
