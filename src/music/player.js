@@ -2,100 +2,101 @@ const {
   joinVoiceChannel,
   createAudioPlayer,
   createAudioResource,
-  entersState,
-  StreamType,
   AudioPlayerStatus,
   VoiceConnectionStatus,
 } = require('@discordjs/voice');
-const { createStream } = require('./ytdlp');
+const { startStream } = require('./ytdlp');
 
-const guilds = new Map();
+const servers = {};
 
-function getGuildPlayer(guildId) {
-  return guilds.get(guildId);
+function getServer(guildId) {
+  return servers[guildId];
 }
 
-async function connect(voiceChannel) {
-  const guildId = voiceChannel.guild.id;
-  const existing = guilds.get(guildId);
+function joinChannel(channel) {
+  const guildId = channel.guild.id;
+  const existing = servers[guildId];
 
-  if (existing && existing.connection.joinConfig.channelId === voiceChannel.id) {
+  if (existing && existing.channelId === channel.id) {
     return existing;
   }
-  if (existing) destroy(guildId);
+
+  if (existing) {
+    leave(guildId);
+  }
 
   const connection = joinVoiceChannel({
-    channelId: voiceChannel.id,
-    guildId,
-    adapterCreator: voiceChannel.guild.voiceAdapterCreator,
-    selfDeaf: true,
+    channelId: channel.id,
+    guildId: guildId,
+    adapterCreator: channel.guild.voiceAdapterCreator,
   });
-
-  await entersState(connection, VoiceConnectionStatus.Ready, 20_000);
 
   const player = createAudioPlayer();
   connection.subscribe(player);
 
-  const gp = { connection, player, current: null, process: null, queue: [] };
+  const server = {
+    channelId: channel.id,
+    connection: connection,
+    player: player,
+    current: null,
+    stream: null,
+    queue: [],
+  };
 
-  player.on('error', (err) => console.error('Audiofout:', err.message));
-
-  player.on(AudioPlayerStatus.Idle, () => {
-    if (gp.process) gp.process.kill();
-    gp.process = null;
-    gp.current = null;
-
-    const next = gp.queue.shift();
-    if (next) play(gp, next);
+  player.on(AudioPlayerStatus.Idle, function () {
+    playNext(server);
   });
 
-  connection.on(VoiceConnectionStatus.Disconnected, async () => {
-    try {
-      await Promise.race([
-        entersState(connection, VoiceConnectionStatus.Signalling, 5_000),
-        entersState(connection, VoiceConnectionStatus.Connecting, 5_000),
-      ]);
-    } catch {
-      destroy(guildId);
-    }
+  player.on('error', function (error) {
+    console.log('Audiofout: ' + error.message);
   });
 
-  guilds.set(guildId, gp);
-  return gp;
+  connection.on(VoiceConnectionStatus.Disconnected, function () {
+    leave(guildId);
+  });
+
+  servers[guildId] = server;
+  return server;
 }
 
-function play(gp, track) {
-  const oldProcess = gp.process;
+function playNext(server) {
+  if (server.stream) {
+    server.stream.kill();
+  }
+  server.stream = null;
+  server.current = null;
 
-  const proc = createStream(track.url);
-  const resource = createAudioResource(proc.stdout, { inputType: StreamType.Arbitrary });
+  if (server.queue.length === 0) {
+    return;
+  }
 
-  gp.process = proc;
-  gp.current = track;
-  gp.player.play(resource);
-
-  if (oldProcess) oldProcess.kill();
+  const track = server.queue.shift();
+  server.stream = startStream(track.url);
+  server.current = track;
+  server.player.play(createAudioResource(server.stream.stdout));
 }
 
-function addTrack(gp, track) {
-  if (!gp.current) {
-    play(gp, track);
+function addTrack(server, track) {
+  server.queue.push(track);
+
+  if (server.current === null) {
+    playNext(server);
     return 0;
   }
-  gp.queue.push(track);
-  return gp.queue.length;
+
+  return server.queue.length;
 }
 
-function destroy(guildId) {
-  const gp = guilds.get(guildId);
-  if (!gp) return;
-  gp.queue = [];
-  if (gp.process) gp.process.kill();
-  gp.player.stop(true);
-  if (gp.connection.state.status !== VoiceConnectionStatus.Destroyed) {
-    gp.connection.destroy();
+function leave(guildId) {
+  const server = servers[guildId];
+  if (!server) {
+    return;
   }
-  guilds.delete(guildId);
+
+  server.queue = [];
+  server.player.stop();
+  server.connection.destroy();
+  delete servers[guildId];
 }
 
-module.exports = { connect, addTrack, destroy, getGuildPlayer };
+module.exports = { getServer, joinChannel, addTrack, leave };

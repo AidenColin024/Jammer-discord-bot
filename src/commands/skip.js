@@ -1,5 +1,5 @@
-const { SlashCommandBuilder, MessageFlags } = require('discord.js');
-const { getGuildPlayer } = require('../music/player');
+const { SlashCommandBuilder } = require('discord.js');
+const { getServer } = require('../music/player');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -7,15 +7,15 @@ module.exports = {
     .setDescription('Sla het huidige nummer over'),
 
   async execute(interaction) {
-    const gp = getGuildPlayer(interaction.guildId);
+    const server = getServer(interaction.guildId);
 
-    if (!gp || !gp.current) {
-      return interaction.reply({ content: '🔇 Er speelt nu niets.', flags: MessageFlags.Ephemeral });
+    if (!server || !server.current) {
+      await interaction.reply('Er speelt nu niets.');
+      return;
     }
 
-    const skipped = gp.current.title;
-    gp.player.stop();
-
-    await interaction.reply(`⏭️ **${skipped}** overgeslagen.`);
+    const title = server.current.title;
+    server.player.stop();
+    await interaction.reply('Overgeslagen: ' + title);
   },
 };
