@@ -1,6 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
 const { resolveTrack } = require('../music/ytdlp');
-const { connect, play } = require('../music/player');
+const { connect, addTrack } = require('../music/player');
 
 function formatDuration(seconds) {
   if (!seconds) return 'Live';
@@ -12,7 +12,7 @@ function formatDuration(seconds) {
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('play')
-    .setDescription('Speel een nummer af via zoekopdracht of link')
+    .setDescription('Speel een nummer af of zet het in de wachtrij')
     .addStringOption((option) =>
       option
         .setName('nummer')
@@ -38,7 +38,6 @@ module.exports = {
       });
     }
 
-    // Zoeken duurt langer dan 3 seconden → Discord laten wachten
     await interaction.deferReply();
 
     let track;
@@ -53,9 +52,10 @@ module.exports = {
       return interaction.editReply(`❌ Niets gevonden voor **${query}**.`);
     }
 
+    let position;
     try {
       const gp = await connect(voiceChannel);
-      play(gp, track);
+      position = addTrack(gp, track);
     } catch (error) {
       console.error('Verbindingsfout:', error.message);
       return interaction.editReply('❌ Ik kon niet verbinden met het spraakkanaal.');
@@ -63,12 +63,20 @@ module.exports = {
 
     const embed = new EmbedBuilder()
       .setColor(0x1db954)
-      .setAuthor({ name: '🎵 Speelt nu' })
       .setTitle(track.title)
       .setURL(track.url)
-      .setDescription(`${track.artist} • ${formatDuration(track.duration)}`)
       .setThumbnail(track.thumbnail)
       .setFooter({ text: `Aangevraagd door ${interaction.user.username}` });
+
+    if (position === 0) {
+      embed
+        .setAuthor({ name: '🎵 Speelt nu' })
+        .setDescription(`${track.artist} • ${formatDuration(track.duration)}`);
+    } else {
+      embed
+        .setAuthor({ name: '➕ Toegevoegd aan de wachtrij' })
+        .setDescription(`${track.artist} • ${formatDuration(track.duration)}\nPositie in wachtrij: **${position}**`);
+    }
 
     await interaction.editReply({ embeds: [embed] });
   },
