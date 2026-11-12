@@ -1,6 +1,9 @@
 require('dotenv').config();
 const fs = require('fs');
 const { Client, Events, GatewayIntentBits } = require('discord.js');
+const {
+  startSpotifyAuthServer,
+} = require('./music/spotifyAuth');
 
 const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates],
@@ -35,4 +38,5 @@ client.on(Events.InteractionCreate, async function (interaction) {
   }
 });
 
+startSpotifyAuthServer();
 client.login(process.env.DISCORD_TOKEN);
