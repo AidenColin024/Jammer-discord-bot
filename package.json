@@ -13,11 +13,11 @@
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
-"scripts": {
-  "check": "node check.js",
-  "deploy": "node src/deploy-commands.js",
-  "start": "node src/index.js"
-},
+  "scripts": {
+    "check": "node check.js",
+    "deploy": "node src/deploy-commands.js",
+    "start": "node src/index.js"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/AidenColin024/Jammer-discord-bot.git"
@@ -30,5 +30,4 @@
     "url": "https://github.com/AidenColin024/Jammer-discord-bot/issues"
   },
   "homepage": "https://github.com/AidenColin024/Jammer-discord-bot#readme"
-  
 }

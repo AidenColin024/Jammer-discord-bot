@@ -2,7 +2,10 @@ const youtubedl = require('youtube-dl-exec');
 
 async function searchTrack(text) {
   let search = text;
+<<<<<<< HEAD
 
+=======
+>>>>>>> origin/dev
   if (!text.startsWith('http')) {
     search = 'ytsearch1:' + text;
   }
@@ -15,7 +18,10 @@ async function searchTrack(text) {
   });
 
   let video = info;
+<<<<<<< HEAD
 
+=======
+>>>>>>> origin/dev
   if (info.entries) {
     video = info.entries[0];
   }
@@ -34,6 +40,7 @@ async function searchTrack(text) {
   };
 }
 
+<<<<<<< HEAD
 async function resolvePlaylist(url) {
   const info = await youtubedl(url, {
     dumpSingleJson: true,
@@ -86,3 +93,16 @@ module.exports = {
   resolvePlaylist,
   startStream,
 };
+=======
+function startStream(url) {
+  const stream = youtubedl.exec(
+    url,
+    { output: '-', format: 'bestaudio', quiet: true },
+    { stdio: ['ignore', 'pipe', 'ignore'] }
+  );
+  stream.catch(function () {});
+  return stream;
+}
+
+module.exports = { searchTrack, startStream };
+>>>>>>> origin/dev

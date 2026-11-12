@@ -5,11 +5,18 @@ const {
   AudioPlayerStatus,
   VoiceConnectionStatus,
 } = require('@discordjs/voice');
+<<<<<<< HEAD
 
 const { startStream } = require('./ytdlp');
 
 const servers = {};
 
+=======
+const { startStream } = require('./ytdlp');
+
+const servers = {};
+
+>>>>>>> origin/dev
 function getServer(guildId) {
   return servers[guildId];
 }
@@ -58,7 +65,10 @@ function joinChannel(channel) {
   });
 
   servers[guildId] = server;
+<<<<<<< HEAD
 
+=======
+>>>>>>> origin/dev
   return server;
 }
 
@@ -66,7 +76,10 @@ function playNext(server) {
   if (server.stream) {
     server.stream.kill();
   }
+<<<<<<< HEAD
 
+=======
+>>>>>>> origin/dev
   server.stream = null;
   server.current = null;
 
@@ -75,6 +88,7 @@ function playNext(server) {
   }
 
   const track = server.queue.shift();
+<<<<<<< HEAD
 
   server.stream = startStream(track.url);
   server.current = track;
@@ -82,6 +96,11 @@ function playNext(server) {
   server.player.play(
     createAudioResource(server.stream.stdout)
   );
+=======
+  server.stream = startStream(track.url);
+  server.current = track;
+  server.player.play(createAudioResource(server.stream.stdout));
+>>>>>>> origin/dev
 }
 
 function addTrack(server, track) {
@@ -95,6 +114,7 @@ function addTrack(server, track) {
   return server.queue.length;
 }
 
+<<<<<<< HEAD
 function addTracks(server, tracks) {
   server.queue.push(...tracks);
 
@@ -108,11 +128,16 @@ function addTracks(server, tracks) {
 function leave(guildId) {
   const server = servers[guildId];
 
+=======
+function leave(guildId) {
+  const server = servers[guildId];
+>>>>>>> origin/dev
   if (!server) {
     return;
   }
 
   server.queue = [];
+<<<<<<< HEAD
 
   if (server.stream) {
     server.stream.kill();
@@ -131,3 +156,11 @@ module.exports = {
   addTracks,
   leave,
 };
+=======
+  server.player.stop();
+  server.connection.destroy();
+  delete servers[guildId];
+}
+
+module.exports = { getServer, joinChannel, addTrack, leave };
+>>>>>>> origin/dev
