@@ -27,9 +27,9 @@ async function resolveTrack(query) {
 
   return {
     title: entry.track || entry.title,
-    artist: entry.artist || entry.uploader || entry.channel || 'Onbekend',
+    artist: entry.artist || entry.uploader || 'Onbekend',
     album: entry.album || null,
-    releaseDate: entry.release_date || entry.upload_date || null,
+    releaseDate: entry.release_date || null,
     duration: entry.duration || 0,
     url: entry.webpage_url,
     thumbnail: entry.thumbnail,
