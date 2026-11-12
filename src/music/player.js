@@ -2,177 +2,138 @@ const {
   joinVoiceChannel,
   createAudioPlayer,
   createAudioResource,
-  entersState,
-  StreamType,
   AudioPlayerStatus,
   VoiceConnectionStatus,
 } = require('@discordjs/voice');
 
-const { createStream } = require('./ytdlp');
+const { startStream } = require('./ytdlp');
 
-const guilds = new Map();
+const servers = {};
 
-function getGuildPlayer(guildId) {
-  return guilds.get(guildId);
+function getServer(guildId) {
+  return servers[guildId];
 }
 
-async function connect(voiceChannel) {
-  const guildId = voiceChannel.guild.id;
-  const existing = guilds.get(guildId);
+function joinChannel(channel) {
+  const guildId = channel.guild.id;
+  const existing = servers[guildId];
 
   // Bot zit al in hetzelfde kanaal
-  if (
-    existing &&
-    existing.connection.joinConfig.channelId === voiceChannel.id
-  ) {
+  if (existing && existing.channelId === channel.id) {
     return existing;
   }
 
+  // Oude verbinding afsluiten
   if (existing) {
-    destroy(guildId);
+    leave(guildId);
   }
 
   const connection = joinVoiceChannel({
-    channelId: voiceChannel.id,
-    guildId,
-    adapterCreator: voiceChannel.guild.voiceAdapterCreator,
-    selfDeaf: true,
+    channelId: channel.id,
+    guildId: guildId,
+    adapterCreator: channel.guild.voiceAdapterCreator,
   });
-
-  await entersState(
-    connection,
-    VoiceConnectionStatus.Ready,
-    20_000
-  );
 
   const player = createAudioPlayer();
 
   connection.subscribe(player);
 
-  const gp = {
-    connection,
-    player,
+  const server = {
+    channelId: channel.id,
+    connection: connection,
+    player: player,
     current: null,
-    process: null,
-
-    // Hier bewaren we nummers die nog moeten spelen
+    stream: null,
     queue: [],
   };
 
-  player.on('error', (error) => {
-    console.error('Audiofout:', error.message);
+  // Als een nummer klaar is, volgende nummer starten
+  player.on(AudioPlayerStatus.Idle, function () {
+    playNext(server);
   });
 
-  // Als een nummer klaar is
-  player.on(AudioPlayerStatus.Idle, () => {
-    gp.current = null;
-
-    if (gp.process) {
-      gp.process.kill();
-    }
-
-    gp.process = null;
-
-    // Speel automatisch volgende nummer
-    playNext(gp);
+  player.on('error', function (error) {
+    console.log('Audiofout: ' + error.message);
   });
 
-  connection.on(
-    VoiceConnectionStatus.Disconnected,
-    async () => {
-      try {
-        await Promise.race([
-          entersState(
-            connection,
-            VoiceConnectionStatus.Signalling,
-            5_000
-          ),
-          entersState(
-            connection,
-            VoiceConnectionStatus.Connecting,
-            5_000
-          ),
-        ]);
-      } catch {
-        destroy(guildId);
-      }
-    }
+  connection.on(VoiceConnectionStatus.Disconnected, function () {
+    leave(guildId);
+  });
+
+  servers[guildId] = server;
+
+  return server;
+}
+
+function playNext(server) {
+  if (server.stream) {
+    server.stream.kill();
+  }
+
+  server.stream = null;
+  server.current = null;
+
+  if (server.queue.length === 0) {
+    return;
+  }
+
+  const track = server.queue.shift();
+
+  server.stream = startStream(track.url);
+  server.current = track;
+
+  server.player.play(
+    createAudioResource(server.stream.stdout)
   );
-
-  guilds.set(guildId, gp);
-
-  return gp;
 }
 
-function play(gp, track) {
-  const oldProcess = gp.process;
+// Eén nummer toevoegen
+function addTrack(server, track) {
+  server.queue.push(track);
 
-  const proc = createStream(track.url);
-
-  const resource = createAudioResource(
-    proc.stdout,
-    {
-      inputType: StreamType.Arbitrary,
-    }
-  );
-
-  gp.process = proc;
-  gp.current = track;
-
-  gp.player.play(resource);
-
-  if (oldProcess) {
-    oldProcess.kill();
+  if (server.current === null) {
+    playNext(server);
+    return 0;
   }
+
+  return server.queue.length;
 }
 
-// Zet meerdere nummers in de wachtrij
-function addToQueue(gp, tracks) {
-  gp.queue.push(...tracks);
+// Meerdere nummers tegelijk toevoegen
+// Deze gebruiken we voor playlists
+function addTracks(server, tracks) {
+  server.queue.push(...tracks);
 
-  // Als er niets speelt, meteen beginnen
-  if (!gp.current) {
-    playNext(gp);
+  if (server.current === null) {
+    playNext(server);
   }
+
+  return server.queue.length;
 }
 
-// Pakt het eerste nummer uit de wachtrij
-function playNext(gp) {
-  if (gp.current) return;
+function leave(guildId) {
+  const server = servers[guildId];
 
-  const nextTrack = gp.queue.shift();
-
-  if (!nextTrack) return;
-
-  play(gp, nextTrack);
-}
-
-function destroy(guildId) {
-  const gp = guilds.get(guildId);
-
-  if (!gp) return;
-
-  if (gp.process) {
-    gp.process.kill();
+  if (!server) {
+    return;
   }
 
-  gp.player.stop(true);
+  server.queue = [];
 
-  if (
-    gp.connection.state.status !==
-    VoiceConnectionStatus.Destroyed
-  ) {
-    gp.connection.destroy();
+  if (server.stream) {
+    server.stream.kill();
   }
 
-  guilds.delete(guildId);
+  server.player.stop();
+  server.connection.destroy();
+
+  delete servers[guildId];
 }
 
 module.exports = {
-  connect,
-  play,
-  destroy,
-  getGuildPlayer,
-  addToQueue,
-  playNext,
+  getServer,
+  joinChannel,
+  addTrack,
+  addTracks,
+  leave,
 };

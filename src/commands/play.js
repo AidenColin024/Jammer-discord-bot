@@ -1,12 +1,23 @@
-const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
-const { resolveTrack } = require('../music/ytdlp');
-const { connect, play } = require('../music/player');
+const {
+  SlashCommandBuilder,
+  EmbedBuilder,
+  MessageFlags,
+} = require('discord.js');
+
+const { searchTrack } = require('../music/ytdlp');
+const { joinChannel, addTrack } = require('../music/player');
 
 function formatDuration(seconds) {
-  if (!seconds) return 'Live';
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60).toString().padStart(2, '0');
-  return `${m}:${s}`;
+  if (!seconds) {
+    return 'Live';
+  }
+
+  const minutes = Math.floor(seconds / 60);
+  const secondsLeft = Math.floor(seconds % 60)
+    .toString()
+    .padStart(2, '0');
+
+  return `${minutes}:${secondsLeft}`;
 }
 
 module.exports = {
@@ -26,50 +37,70 @@ module.exports = {
 
     if (!voiceChannel) {
       return interaction.reply({
-        content: '🔇 Ga eerst in een spraakkanaal zitten.',
+        content: 'Ga eerst in een spraakkanaal zitten.',
         flags: MessageFlags.Ephemeral,
       });
     }
 
     if (/open\.spotify\.com|^spotify:/.test(query)) {
       return interaction.reply({
-        content: '🟢 Spotify-links worden nog gebouwd. Gebruik voorlopig een zoekterm of YouTube-link.',
+        content:
+          'Spotify-links worden nog gebouwd. Gebruik voorlopig een zoekterm of YouTube-link.',
         flags: MessageFlags.Ephemeral,
       });
     }
 
-    // Zoeken duurt langer dan 3 seconden → Discord laten wachten
     await interaction.deferReply();
 
-    let track;
     try {
-      track = await resolveTrack(query);
+      const track = await searchTrack(query);
+
+      if (!track) {
+        return interaction.editReply(
+          'Ik kon geen nummer vinden.'
+        );
+      }
+
+      const server = joinChannel(voiceChannel);
+
+      const position = addTrack(server, track);
+
+      const embed = new EmbedBuilder()
+        .setColor(0x1db954)
+        .setTitle(track.title)
+        .setURL(track.url)
+        .addFields(
+          {
+            name: 'Artiest',
+            value: track.artist || 'Onbekend',
+            inline: true,
+          },
+          {
+            name: 'Duur',
+            value: formatDuration(track.duration),
+            inline: true,
+          }
+        );
+
+      if (position === 0) {
+        embed.setAuthor({
+          name: 'Nu aan het spelen',
+        });
+      } else {
+        embed.setAuthor({
+          name: `Toegevoegd aan wachtrij - positie ${position}`,
+        });
+      }
+
+      await interaction.editReply({
+        embeds: [embed],
+      });
     } catch (error) {
-      console.error('Zoekfout:', error.message);
-      return interaction.editReply('❌ Er ging iets mis bij het zoeken.');
+      console.error('Play fout:', error);
+
+      await interaction.editReply(
+        'Het nummer kon niet worden afgespeeld.'
+      );
     }
-
-    if (!track) {
-      return interaction.editReply(`❌ Niets gevonden voor **${query}**.`);
-    }
-
-    try {
-      const gp = await connect(voiceChannel);
-      play(gp, track);
-    } catch (error) {
-      console.error('Verbindingsfout:', error.message);
-      return interaction.editReply('❌ Ik kon niet verbinden met het spraakkanaal.');
-    }
-
-    const embed = new EmbedBuilder()
-      .setColor(0x1db954)
-      .setAuthor({ name: '🎵 Speelt nu' })
-      .setTitle(track.title)
-      .setURL(track.url)
-      .setDescription(`${track.artist} • ${formatDuration(track.duration)}`)
-      .setThumbnail(track.thumbnail)
-      .setFooter({ text: `Aangevraagd door ${interaction.user.username}` });
-
-    await interaction.editReply({ embeds: [embed] });
   },
 };

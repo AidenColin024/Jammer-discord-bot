@@ -1,42 +1,40 @@
 const youtubedl = require('youtube-dl-exec');
 
-function isUrl(text) {
-  try {
-    new URL(text);
-    return true;
-  } catch {
-    return false;
+async function searchTrack(text) {
+  let search = text;
+
+  if (!text.startsWith('http')) {
+    search = 'ytsearch1:' + text;
   }
-}
 
-// Zoekt één nummer op
-async function resolveTrack(query) {
-  const target = isUrl(query) ? query : `ytsearch1:${query}`;
-
-  const info = await youtubedl(target, {
+  const info = await youtubedl(search, {
     dumpSingleJson: true,
     noWarnings: true,
     noPlaylist: true,
     skipDownload: true,
-    format: 'bestaudio',
   });
 
-  const entry = info.entries ? info.entries[0] : info;
+  let video = info;
 
-  if (!entry) return null;
+  if (info.entries) {
+    video = info.entries[0];
+  }
+
+  if (!video) {
+    return null;
+  }
 
   return {
-    title: entry.track || entry.title,
-    artist: entry.artist || entry.uploader || entry.channel || 'Onbekend',
-    album: entry.album || null,
-    releaseDate: entry.release_date || entry.upload_date || null,
-    duration: entry.duration || 0,
-    url: entry.webpage_url,
-    thumbnail: entry.thumbnail,
+    title: video.track || video.title,
+    artist: video.artist || video.uploader || 'Onbekend',
+    album: video.album || 'Onbekend',
+    releaseDate: video.release_date || null,
+    duration: video.duration || 0,
+    url: video.webpage_url,
   };
 }
 
-// Haalt alle nummers uit een playlist
+// Haalt alle nummers uit een YouTube-playlist
 async function resolvePlaylist(url) {
   const info = await youtubedl(url, {
     dumpSingleJson: true,
@@ -45,24 +43,27 @@ async function resolvePlaylist(url) {
     noWarnings: true,
   });
 
-  if (!info.entries) return [];
+  if (!info.entries) {
+    return [];
+  }
 
-  return info.entries.map((entry) => ({
-    title: entry.title || 'Onbekend nummer',
-    artist: entry.uploader || entry.channel || 'Onbekend',
-    album: null,
-    releaseDate: null,
-    duration: entry.duration || 0,
-    url: entry.url.startsWith('http')
-      ? entry.url
-      : `https://www.youtube.com/watch?v=${entry.id}`,
-    thumbnail: entry.thumbnail || null,
-  }));
+  return info.entries
+    .filter((entry) => entry)
+    .map((entry) => ({
+      title: entry.title || 'Onbekend nummer',
+      artist: entry.uploader || entry.channel || 'Onbekend',
+      album: null,
+      releaseDate: null,
+      duration: entry.duration || 0,
+      url: entry.url && entry.url.startsWith('http')
+        ? entry.url
+        : `https://www.youtube.com/watch?v=${entry.id}`,
+      thumbnail: entry.thumbnail || null,
+    }));
 }
 
-// Start audiostream
-function createStream(url) {
-  const proc = youtubedl.exec(
+function startStream(url) {
+  const stream = youtubedl.exec(
     url,
     {
       output: '-',
@@ -75,13 +76,13 @@ function createStream(url) {
     }
   );
 
-  proc.catch(() => {});
+  stream.catch(function () {});
 
-  return proc;
+  return stream;
 }
 
 module.exports = {
-  resolveTrack,
+  searchTrack,
   resolvePlaylist,
-  createStream,
+  startStream,
 };

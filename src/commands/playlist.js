@@ -8,8 +8,8 @@ const {
 } = require('../music/ytdlp');
 
 const {
-  connect,
-  addToQueue,
+  joinChannel,
+  addTracks,
 } = require('../music/player');
 
 module.exports = {
@@ -24,26 +24,19 @@ module.exports = {
     ),
 
   async execute(interaction) {
-    const link =
-      interaction.options.getString('link');
+    const link = interaction.options.getString('link');
+    const voiceChannel = interaction.member.voice.channel;
 
-    const voiceChannel =
-      interaction.member.voice.channel;
-
-    // Gebruiker moet eerst in voice zitten
     if (!voiceChannel) {
       return interaction.reply({
-        content:
-          'Ga eerst in een spraakkanaal zitten.',
+        content: 'Ga eerst in een spraakkanaal zitten.',
         flags: MessageFlags.Ephemeral,
       });
     }
 
-    // Spotify hoort bij een andere feature
     if (link.includes('spotify.com')) {
       return interaction.reply({
-        content:
-          'Spotify-playlists worden nog niet ondersteund.',
+        content: 'Spotify-playlists worden nog niet ondersteund.',
         flags: MessageFlags.Ephemeral,
       });
     }
@@ -51,9 +44,7 @@ module.exports = {
     await interaction.deferReply();
 
     try {
-      // Playlist ophalen
-      const tracks =
-        await resolvePlaylist(link);
+      const tracks = await resolvePlaylist(link);
 
       if (!tracks.length) {
         return interaction.editReply(
@@ -61,21 +52,15 @@ module.exports = {
         );
       }
 
-      // Verbinden met voice-channel
-      const gp =
-        await connect(voiceChannel);
+      const server = joinChannel(voiceChannel);
 
-      // Alle nummers toevoegen
-      addToQueue(gp, tracks);
+      addTracks(server, tracks);
 
       await interaction.editReply(
         `Playlist toegevoegd. ${tracks.length} nummers zijn aan de wachtrij toegevoegd.`
       );
     } catch (error) {
-      console.error(
-        'Playlist fout:',
-        error.message
-      );
+      console.error('Playlist fout:', error);
 
       await interaction.editReply(
         'De playlist kon niet worden geladen.'
