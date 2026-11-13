@@ -1,4 +1,4 @@
-const { SlashCommandBuilder } = require('discord.js');
+const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const { getUserPlaylists } = require('../music/spotifyAuth');
 
 module.exports = {
@@ -7,46 +7,25 @@ module.exports = {
     .setDescription('Bekijk je Spotify-playlists'),
 
   async execute(interaction) {
-    await interaction.deferReply({
-      ephemeral: true,
-    });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     try {
-      const playlists = await getUserPlaylists(
-        interaction.user.id
-      );
-
+      const playlists = await getUserPlaylists(interaction.user.id);
       if (!playlists) {
-        await interaction.editReply(
-          'Koppel eerst je Spotify-account met /spotify-login.'
-        );
-        return;
+        return interaction.editReply('Koppel eerst Spotify met /spotify-login.');
       }
-
       if (playlists.length === 0) {
-        await interaction.editReply(
-          'Ik kon geen Spotify-playlists vinden.'
-        );
-        return;
+        return interaction.editReply('Geen playlists gevonden.');
       }
 
       let message = 'Jouw Spotify-playlists:\n\n';
-
       for (let i = 0; i < playlists.length; i++) {
-        message +=
-          (i + 1) +
-          '. ' +
-          playlists[i].name +
-          '\n';
+        message += (i + 1) + '. ' + playlists[i].name + '\n';
       }
-
-      await interaction.editReply(message);
+      return interaction.editReply(message);
     } catch (error) {
-      console.log(error);
-
-      await interaction.editReply(
-        'Er ging iets mis bij het ophalen van je Spotify-playlists.'
-      );
+      console.error(error);
+      return interaction.editReply('Playlists ophalen mislukt.');
     }
   },
 };

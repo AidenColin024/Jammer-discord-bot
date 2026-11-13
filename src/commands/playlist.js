@@ -1,33 +1,22 @@
-const {
-  SlashCommandBuilder,
-  MessageFlags,
-} = require('discord.js');
-
-const {
-  resolvePlaylist,
-} = require('../music/ytdlp');
-
-const {
-  joinChannel,
-  addTracks,
-} = require('../music/player');
+const { SlashCommandBuilder, MessageFlags } = require('discord.js');
+const { resolvePlaylist } = require('../music/ytdlp');
+const { joinChannel, addTracks } = require('../music/player');
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('playlist')
     .setDescription('Voeg een YouTube-playlist toe aan de wachtrij')
-    .addStringOption((option) =>
-      option
-        .setName('link')
+    .addStringOption(option =>
+      option.setName('link')
         .setDescription('Link naar een YouTube-playlist')
         .setRequired(true)
     ),
 
   async execute(interaction) {
     const link = interaction.options.getString('link');
-    const voiceChannel = interaction.member.voice.channel;
+    const channel = interaction.member.voice.channel;
 
-    if (!voiceChannel) {
+    if (!channel) {
       return interaction.reply({
         content: 'Ga eerst in een spraakkanaal zitten.',
         flags: MessageFlags.Ephemeral,
@@ -46,25 +35,16 @@ module.exports = {
     try {
       const tracks = await resolvePlaylist(link);
 
-      if (!tracks.length) {
-        return interaction.editReply(
-          'Ik kon geen nummers in deze playlist vinden.'
-        );
+      if (tracks.length === 0) {
+        return interaction.editReply('Geen nummers gevonden in de playlist.');
       }
 
-      const server = joinChannel(voiceChannel);
-
+      const server = joinChannel(channel);
       addTracks(server, tracks);
-
-      await interaction.editReply(
-        `Playlist toegevoegd. ${tracks.length} nummers zijn aan de wachtrij toegevoegd.`
-      );
+      return interaction.editReply(tracks.length + ' nummers toegevoegd aan de wachtrij.');
     } catch (error) {
-      console.error('Playlist fout:', error);
-
-      await interaction.editReply(
-        'De playlist kon niet worden geladen.'
-      );
+      console.error(error);
+      return interaction.editReply('De playlist kon niet worden geladen.');
     }
   },
 };
