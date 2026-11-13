@@ -1,4 +1,4 @@
-const { SlashCommandBuilder } = require('discord.js');
+const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const { getUserToken } = require('../music/spotifyAuth');
 
 module.exports = {
@@ -7,63 +7,34 @@ module.exports = {
     .setDescription('Bekijk je gelikete Spotify-nummers'),
 
   async execute(interaction) {
-    await interaction.deferReply({
-      ephemeral: true,
-    });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     try {
-      const tokenData = getUserToken(interaction.user.id);
-
-      if (!tokenData) {
-        await interaction.editReply(
-          'Koppel eerst je Spotify-account met /spotify-login.'
-        );
-        return;
+      const token = await getUserToken(interaction.user.id);
+      if (!token) {
+        return interaction.editReply('Koppel eerst Spotify met /spotify-login.');
       }
 
-      const response = await fetch(
-        'https://api.spotify.com/v1/me/tracks?limit=10',
-        {
-          headers: {
-            Authorization: 'Bearer ' + tokenData.accessToken,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error('Geliked nummers ophalen mislukt');
-      }
+      const response = await fetch('https://api.spotify.com/v1/me/tracks?limit=10', {
+        headers: { Authorization: 'Bearer ' + token.accessToken },
+      });
+      if (!response.ok) throw new Error('Nummers ophalen mislukt');
 
       const data = await response.json();
-
       if (data.items.length === 0) {
-        await interaction.editReply(
-          'Ik kon geen gelikete nummers vinden.'
-        );
-        return;
+        return interaction.editReply('Geen gelikete nummers gevonden.');
       }
 
       let message = 'Jouw gelikete nummers:\n\n';
-
       for (let i = 0; i < data.items.length; i++) {
         const track = data.items[i].track;
-
-        message +=
-          (i + 1) +
-          '. ' +
-          track.name +
-          ' - ' +
-          track.artists.map((artist) => artist.name).join(', ') +
-          '\n';
+        const artists = track.artists.map(artist => artist.name).join(', ');
+        message += (i + 1) + '. ' + track.name + ' - ' + artists + '\n';
       }
-
-      await interaction.editReply(message);
+      return interaction.editReply(message);
     } catch (error) {
-      console.log(error);
-
-      await interaction.editReply(
-        'Er ging iets mis bij het ophalen van je gelikete nummers.'
-      );
+      console.error(error);
+      return interaction.editReply('Gelikete nummers ophalen mislukt.');
     }
   },
 };
